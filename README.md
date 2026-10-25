@@ -1,27 +1,19 @@
-# Employee CSV Processor & Validator
+# Application Log File Analyzer & Statistics Generator
 
-A standalone Java application that reads employee records from a CSV file, validates each entry against business rules, computes key summary and departmental statistics, and exports the results into separate, structured CSV reports.
+A standalone Java application that reads an application log file line-by-line using `BufferedReader`, tallies log levels (`INFO`, `WARNING`, and `ERROR`), and calculates the distribution percentage for each level.
 
-Built using standard Java SE libraries (`java.nio.file`, `java.time`, and Java Collections) without external third-party dependencies.
+Built using standard Java SE libraries (`java.io`) without third-party dependencies.
 
 ---
 
 ## 📋 Features
 
-- **Standard Java Implementation**: Runs with native Java SE classes (no Maven/Gradle or third-party packages required).
-- **Comprehensive Data Validation**:
-  - Validates CSV header structure.
-  - Ensures required fields (`EmployeeID`, `Name`, `Department`, `JoiningDate`) are present and non-empty.
-  - Checks for unique `EmployeeID` across valid entries.
-  - Validates numerical ranges: Age must be between `18` and `60`.
-  - Validates salary amounts: Must be positive, finite numbers.
-  - Validates ISO-8601 date formatting: Must match `yyyy-MM-dd`.
-- **Error Tracking**: Logs rejected records with exact error messages explaining why validation failed.
-- **Statistical Aggregation**:
-  - Calculates total records, valid count, and invalid count.
-  - Calculates overall average, minimum, and maximum salary for valid employees.
-  - Aggregates employee headcount and average salary by department using sorted `TreeMap` collections.
-- **Multi-File Output**: Generates valid records, rejection logs, and statistics in distinct CSV files.
+- **Memory-Efficient Streaming**: Utilizes `BufferedReader` to process log files line-by-line, maintaining low and predictable memory usage even on large files.
+- **Resource Management**: Implements Java 7+ try-with-resources to guarantee safe and automatic stream closure.
+- **Case-Insensitive Parsing**: Normalizes entries with `toUpperCase()` to handle varying case conventions (`INFO`, `info`, `Warning`, etc.).
+- **Log Level Aggregation**: Tracks total parsed records alongside individual counts for `INFO`, `WARNING`, and `ERROR`.
+- **Percentage Distribution**: Computes the proportion of each log level with two-decimal precision using `printf`.
+- **Zero-Dependency**: Runs natively on standard Java SE (JDK 8 or higher).
 
 ---
 
@@ -29,83 +21,59 @@ Built using standard Java SE libraries (`java.nio.file`, `java.time`, and Java C
 
 ```text
 .
-├── employees.csv              # Input CSV data
-├── EmployeeCSVProcessor.java  # Main processor source code
-├── processed_employees.csv    # Output: Validated employee records
-├── invalid_employees.csv      # Output: Rejected records with error reasons
-├── employee_statistics.csv    # Output: Summary and departmental metrics
-└── README.md                  # Project documentation
+├── application.log      # Sample input log file with timestamped entries
+├── Practise.java        # Core Java source code for log parsing & statistics
+├── .gitignore           # Git ignore rule for compiled bytecode (*.class)
+└── README.md            # Project documentation and execution instructions
 ```
 
 ---
 
-## 📥 Input Data Format (`employees.csv`)
+## 📥 Input Data Format (`application.log`)
 
-The input file must have the following comma-separated header and column structure:
+The application expects an input log file named `application.log` located in the application's working directory.
 
-```csv
-EmployeeID,Name,Age,Department,Salary,JoiningDate
-101,Ravi,25,IT,45000,2023-01-15
-102,Sita,30,HR,50000,2022-06-10
-103,Arun,28,IT,55000,2021-03-20
-104,Priya,22,Finance,40000,2024-02-01
-102,Kiran,35,HR,60000,2020-05-12
-105,Rahul,-5,IT,-1000,2023-11-11
-106,Anu,27,Finance,48000,2022-09-15
+### Sample Contents
+```text
+2026-10-25 09:00:01 INFO Application started
+2026-10-25 09:00:02 INFO Database connected
+2026-10-25 09:00:03 WARNING Disk space is low
+2026-10-25 09:00:04 ERROR Database connection failed
+2026-10-25 09:00:05 INFO User logged in
+2026-10-25 09:00:06 ERROR File not found
 ```
 
-### Validation Rules
-
-| Field | Validation Rule |
-| :--- | :--- |
-| **Header** | Must match exact schema: `EmployeeID,Name,Age,Department,Salary,JoiningDate` |
-| **EmployeeID** | Required, non-empty, and unique across accepted records |
-| **Name** | Required, non-empty |
-| **Age** | Integer between `18` and `60` (inclusive) |
-| **Department** | Required, non-empty |
-| **Salary** | Finite numeric value $\ge 0$ |
-| **JoiningDate** | Valid ISO date adhering to `yyyy-MM-dd` |
+### Log Schema Breakdown
+Each line contains three primary components:
+1. **Timestamp**: `yyyy-MM-dd HH:mm:ss` (e.g., `2026-10-25 09:00:01`)
+2. **Log Level**: The severity marker (`INFO`, `WARNING`, or `ERROR`)
+3. **Message**: Free-form diagnostic description of the application event
 
 ---
 
-## 📤 Output Files
+## 📊 Statistical Calculation
 
-When processed, the program produces three files in the working directory:
+The percentage for each log level is calculated using the formula:
 
-### 1. `processed_employees.csv`
-Contains all valid employee records:
-```csv
-EmployeeID,Name,Age,Department,Salary,JoiningDate
-101,Ravi,25,IT,45000,2023-01-15
-102,Sita,30,HR,50000,2022-06-10
-103,Arun,28,IT,55000,2021-03-20
-104,Priya,22,Finance,40000,2024-02-01
-106,Anu,27,Finance,48000,2022-09-15
-```
+$$\text{Percentage} = \left( \frac{\text{Log Level Count}}{\text{Total Log Entries}} \right) \times 100$$
 
-### 2. `invalid_employees.csv`
-Contains rejected records along with the reasons for rejection:
-```csv
-EmployeeID,Name,Age,Department,Salary,JoiningDate,ErrorReason
-102,Kiran,35,HR,60000,2020-05-12,"Duplicate employee ID"
-105,Rahul,-5,IT,-1000,2023-11-11,"Age must be 18-60; Invalid salary"
-```
+Formatted output is rounded to two decimal places using the `%.2f%%` specifier in `System.out.printf`.
 
-### 3. `employee_statistics.csv`
-Summary statistics and departmental breakdown:
-```csv
-Metric,Value
-Total Records,7
-Valid Records,5
-Invalid Records,2
-Average Salary,47600.00
-Minimum Salary,40000.0
-Maximum Salary,55000.0
+---
 
-Department,EmployeeCount,AverageSalary
-Finance,2,44000.00
-HR,1,50000.00
-IT,2,50000.00
+## 📤 Output
+
+When executed with the sample dataset, the program outputs:
+
+```text
+===== LOG STATISTICS =====
+Total log entries: 6
+INFO count: 3
+WARNING count: 1
+ERROR count: 2
+INFO percentage: 50.00%
+WARNING percentage: 16.67%
+ERROR percentage: 33.33%
 ```
 
 ---
@@ -124,38 +92,44 @@ java -version
 
 ### Compilation & Execution
 
-1. Clone or open the project folder in your terminal:
+1. Open your terminal in the project directory:
    ```bash
    cd "path/to/java intership"
    ```
 
-2. Compile the Java file:
+2. Compile the Java source file:
    ```bash
-   javac EmployeeCSVProcessor.java
+   javac Practise.java
    ```
 
 3. Run the application:
    ```bash
-   java EmployeeCSVProcessor
+   java Practise
    ```
 
-### Terminal Output
-Upon successful execution, you will see:
-```text
-Processing completed!
-Total records: 7
-Valid records: 5
-Invalid records: 2
-Average salary: 47600.00
-Generated files:
-1. processed_employees.csv
-2. invalid_employees.csv
-3. employee_statistics.csv
-```
+---
+
+## ⚙️ How the Code Works
+
+1. **File Opening**: A `FileReader` wrapped in a `BufferedReader` opens `application.log` inside a try-with-resources statement.
+2. **Line-by-Line Iteration**: `br.readLine()` reads the file sequentially until it reaches the end of the file (`null`).
+3. **Classification**:
+   - `line.toUpperCase()` normalizes the input string.
+   - Conditional statements check whether the line contains `INFO`, `WARNING`, or `ERROR`.
+   - Relevant counters and `totalCount` increment accordingly.
+4. **Summary & Percentage Calculation**: Computes and prints the final statistics and percentages to `System.out`.
+5. **Exception Handling**: Traps and reports `IOException` if the file is missing or unreadable.
 
 ---
 
 ## 💡 Notes & Production Considerations
 
-- **CSV Quoting**: This lightweight parser splits lines using basic comma delimiters (`line.split(",", -1)`). For production environments with quoted fields containing embedded commas or multiline text, consider using a dedicated CSV library like [Apache Commons CSV](https://commons.apache.org/proper/commons-csv/) or [OpenCSV](https://opencsv.sourceforge.net/).
-- **Memory Efficiency**: Streams the input file line-by-line using `BufferedReader`, ensuring low memory footprint even with large datasets.
+- **Log Field Boundary Matching**:
+  The basic implementation uses `String.contains()`. In production systems, a log message might describe an error without being an error-level log (e.g., `INFO Error handler initialized successfully`). In production pipelines, consider tokenizing by delimiter (e.g., `parts[2]`) or applying regex:
+  ```java
+  Pattern.compile("^\\S+\\s+\\S+\\s+(INFO|WARNING|ERROR)\\b")
+  ```
+- **Extensible Log Levels**:
+  For applications supporting additional severity levels (`DEBUG`, `TRACE`, `FATAL`), a `Map<String, Integer>` or Java `enum` can dynamically aggregate metrics without cascading `if-else` blocks.
+- **Java NIO Streams**:
+  In modern Java (Java 8+), processing can also be expressed concisely using `Files.lines(Path.of(filePath))` combined with Stream collectors (`Collectors.groupingBy(..., Collectors.counting())`).
