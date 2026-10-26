@@ -1,60 +1,83 @@
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-
 public class Practise {
 
-    public static void main(String[] args) {
+    static final long N = 100_000_000L;
+    static final int THREAD_COUNT = 4;
 
-        String filePath = "application.log";
+    public static void main(String[] args)
+            throws InterruptedException {
 
-        int infoCount = 0;
-        int warningCount = 0;
-        int errorCount = 0;
-        int totalCount = 0;
+        // 1. Single-thread execution
+        long start = System.nanoTime();
 
-        try (BufferedReader br =
-                     new BufferedReader(new FileReader(filePath))) {
+        long singleResult = calculateSum(1, N);
 
-            String line;
+        long end = System.nanoTime();
 
-            while ((line = br.readLine()) != null) {
+        double singleTime = (end - start) / 1_000_000.0;
 
-                String upperLine = line.toUpperCase();
+        System.out.println("Single Thread Result: " + singleResult);
+        System.out.printf("Single Thread Time: %.2f ms%n", singleTime);
 
-                if (upperLine.contains("INFO")) {
-                    infoCount++;
-                    totalCount++;
-                } else if (upperLine.contains("WARNING")) {
-                    warningCount++;
-                    totalCount++;
-                } else if (upperLine.contains("ERROR")) {
-                    errorCount++;
-                    totalCount++;
-                }
-            }
 
-            System.out.println("===== LOG STATISTICS =====");
-            System.out.println("Total log entries: " + totalCount);
+        // 2. Multithreaded execution
+        long[] results = new long[THREAD_COUNT];
+        Thread[] threads = new Thread[THREAD_COUNT];
 
-            System.out.println("INFO count: " + infoCount);
-            System.out.println("WARNING count: " + warningCount);
-            System.out.println("ERROR count: " + errorCount);
+        long chunkSize = N / THREAD_COUNT;
 
-            if (totalCount > 0) {
-                System.out.printf("INFO percentage: %.2f%%%n",
-                        infoCount * 100.0 / totalCount);
+        start = System.nanoTime();
 
-                System.out.printf("WARNING percentage: %.2f%%%n",
-                        warningCount * 100.0 / totalCount);
+        for (int i = 0; i < THREAD_COUNT; i++) {
 
-                System.out.printf("ERROR percentage: %.2f%%%n",
-                        errorCount * 100.0 / totalCount);
-            }
+            long from = i * chunkSize + 1;
+            long to = (i == THREAD_COUNT - 1)
+                    ? N
+                    : (i + 1) * chunkSize;
 
-        } catch (IOException e) {
-            System.out.println("Error reading log file: "
-                    + e.getMessage());
+            final int index = i;
+
+            threads[i] = new Thread(() -> {
+                results[index] = calculateSum(from, to);
+            });
+
+            threads[i].start();
         }
+
+        // Wait for every thread to finish
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
+        long multiResult = 0;
+
+        for (long result : results) {
+            multiResult += result;
+        }
+
+        end = System.nanoTime();
+
+        double multiTime = (end - start) / 1_000_000.0;
+
+        System.out.println("\nMultithreaded Result: " + multiResult);
+        System.out.printf("Multithreaded Time: %.2f ms%n", multiTime);
+
+        System.out.printf(
+            "Speedup: %.2fx%n",
+            singleTime / multiTime
+        );
+
+        System.out.println(
+            "Results Match: " + (singleResult == multiResult)
+        );
+    }
+
+    static long calculateSum(long from, long to) {
+        long sum = 0;
+
+        for (long i = from; i <= to; i++) {
+            sum += i;
+        }
+
+        return sum;
     }
 }

@@ -1,135 +1,92 @@
-# Application Log File Analyzer & Statistics Generator
+# Java Multithreading Performance Comparison
 
-A standalone Java application that reads an application log file line-by-line using `BufferedReader`, tallies log levels (`INFO`, `WARNING`, and `ERROR`), and calculates the distribution percentage for each level.
-
-Built using standard Java SE libraries (`java.io`) without third-party dependencies.
+A demonstration and benchmark comparing single-threaded and multithreaded execution in Java by calculating the sum of integers from 1 to 100,000,000.
 
 ---
 
-## 📋 Features
+## 📌 Overview
 
-- **Memory-Efficient Streaming**: Utilizes `BufferedReader` to process log files line-by-line, maintaining low and predictable memory usage even on large files.
-- **Resource Management**: Implements Java 7+ try-with-resources to guarantee safe and automatic stream closure.
-- **Case-Insensitive Parsing**: Normalizes entries with `toUpperCase()` to handle varying case conventions (`INFO`, `info`, `Warning`, etc.).
-- **Log Level Aggregation**: Tracks total parsed records alongside individual counts for `INFO`, `WARNING`, and `ERROR`.
-- **Percentage Distribution**: Computes the proportion of each log level with two-decimal precision using `printf`.
-- **Zero-Dependency**: Runs natively on standard Java SE (JDK 8 or higher).
+This project benchmarks CPU-bound work in Java to demonstrate how parallel task partitioning across multiple threads affects execution time and throughput on multicore processors.
+
+- **Range:** $1$ to $100{,}000{,}000$ ($N = 10^8$)
+- **Threads:** 4 worker threads
+- **Target Sum:** $\frac{N(N+1)}{2} = 5{,}000{,}000{,}050{,}000{,}000$
 
 ---
 
-## 📁 Project Structure
+## ⚙️ Work Partitioning
+
+The range of 100 million numbers is divided into four equal chunks:
 
 ```text
-.
-├── application.log      # Sample input log file with timestamped entries
-├── Practise.java        # Core Java source code for log parsing & statistics
-├── .gitignore           # Git ignore rule for compiled bytecode (*.class)
-└── README.md            # Project documentation and execution instructions
+Main Thread
+  │
+  ├── Spawns Thread 1 ──> [1         to  25,000,000] ──> Partial Sum 1
+  ├── Spawns Thread 2 ──> [25,000,001 to  50,000,000] ──> Partial Sum 2
+  ├── Spawns Thread 3 ──> [50,000,001 to  75,000,000] ──> Partial Sum 3
+  └── Spawns Thread 4 ──> [75,000,001 to 100,000,000] ──> Partial Sum 4
+  │
+  ├── thread.join() on all workers
+  └── Combine partial sums ──> Final Sum
 ```
 
 ---
 
-## 📥 Input Data Format (`application.log`)
+## 🔑 Key Java Concepts
 
-The application expects an input log file named `application.log` located in the application's working directory.
+| Code / Concept | Purpose |
+| :--- | :--- |
+| `new Thread(...)` | Instantiates a new worker thread. |
+| `thread.start()` | Schedules and begins execution of the worker thread asynchronously. |
+| `thread.join()` | Blocks the calling thread (main thread) until the target thread finishes execution. |
+| `System.nanoTime()` | High-resolution time-source for measuring elapsed execution time. |
+| `results[index]` | Stores each thread's independent partial sum to avoid shared mutable state and lock contention. |
 
-### Sample Contents
-```text
-2026-10-25 09:00:01 INFO Application started
-2026-10-25 09:00:02 INFO Database connected
-2026-10-25 09:00:03 WARNING Disk space is low
-2026-10-25 09:00:04 ERROR Database connection failed
-2026-10-25 09:00:05 INFO User logged in
-2026-10-25 09:00:06 ERROR File not found
-```
-
-### Log Schema Breakdown
-Each line contains three primary components:
-1. **Timestamp**: `yyyy-MM-dd HH:mm:ss` (e.g., `2026-10-25 09:00:01`)
-2. **Log Level**: The severity marker (`INFO`, `WARNING`, or `ERROR`)
-3. **Message**: Free-form diagnostic description of the application event
+### Concurrency Safety Notes
+- **Why use `join()`?** Without `join()`, the main thread might aggregate the results array prematurely before workers complete their calculations.
+- **Why is the `results` array thread-safe here?** Each thread writes exclusively to a dedicated array index ($0, 1, 2, 3$). The main thread accesses the array only after all worker threads have completed (`join()`), creating a *happens-before* relationship without requiring locks or synchronized blocks.
 
 ---
 
-## 📊 Statistical Calculation
-
-The percentage for each log level is calculated using the formula:
-
-$$\text{Percentage} = \left( \frac{\text{Log Level Count}}{\text{Total Log Entries}} \right) \times 100$$
-
-Formatted output is rounded to two decimal places using the `%.2f%%` specifier in `System.out.printf`.
-
----
-
-## 📤 Output
-
-When executed with the sample dataset, the program outputs:
-
-```text
-===== LOG STATISTICS =====
-Total log entries: 6
-INFO count: 3
-WARNING count: 1
-ERROR count: 2
-INFO percentage: 50.00%
-WARNING percentage: 16.67%
-ERROR percentage: 33.33%
-```
-
----
-
-## 🚀 Getting Started
+## 🚀 Running the Project
 
 ### Prerequisites
+- Java Development Kit (JDK 8 or higher) installed and configured in your `PATH`.
 
-- **Java Development Kit (JDK)**: Version 8 or higher (tested with JDK 23).
+### Compile & Execute
 
-Verify your Java installation:
 ```bash
-javac -version
-java -version
+# Compile
+javac Practise.java
+
+# Run
+java Practise
 ```
 
-### Compilation & Execution
+---
 
-1. Open your terminal in the project directory:
-   ```bash
-   cd "path/to/java intership"
-   ```
+## 📊 Sample Output
 
-2. Compile the Java source file:
-   ```bash
-   javac Practise.java
-   ```
+```text
+Single Thread Result: 5000000050000000
+Single Thread Time: 43.85 ms
 
-3. Run the application:
-   ```bash
-   java Practise
-   ```
+Multithreaded Result: 5000000050000000
+Multithreaded Time: 30.11 ms
+
+Speedup: 1.46x
+Results Match: true
+```
+
+### Performance & Speedup Formula
+
+$$\text{Speedup} = \frac{\text{Single-Thread Time}}{\text{Multithreaded Time}}$$
 
 ---
 
-## ⚙️ How the Code Works
+## 💡 Key Observations & Next Steps
 
-1. **File Opening**: A `FileReader` wrapped in a `BufferedReader` opens `application.log` inside a try-with-resources statement.
-2. **Line-by-Line Iteration**: `br.readLine()` reads the file sequentially until it reaches the end of the file (`null`).
-3. **Classification**:
-   - `line.toUpperCase()` normalizes the input string.
-   - Conditional statements check whether the line contains `INFO`, `WARNING`, or `ERROR`.
-   - Relevant counters and `totalCount` increment accordingly.
-4. **Summary & Percentage Calculation**: Computes and prints the final statistics and percentages to `System.out`.
-5. **Exception Handling**: Traps and reports `IOException` if the file is missing or unreadable.
-
----
-
-## 💡 Notes & Production Considerations
-
-- **Log Field Boundary Matching**:
-  The basic implementation uses `String.contains()`. In production systems, a log message might describe an error without being an error-level log (e.g., `INFO Error handler initialized successfully`). In production pipelines, consider tokenizing by delimiter (e.g., `parts[2]`) or applying regex:
-  ```java
-  Pattern.compile("^\\S+\\s+\\S+\\s+(INFO|WARNING|ERROR)\\b")
-  ```
-- **Extensible Log Levels**:
-  For applications supporting additional severity levels (`DEBUG`, `TRACE`, `FATAL`), a `Map<String, Integer>` or Java `enum` can dynamically aggregate metrics without cascading `if-else` blocks.
-- **Java NIO Streams**:
-  In modern Java (Java 8+), processing can also be expressed concisely using `Files.lines(Path.of(filePath))` combined with Stream collectors (`Collectors.groupingBy(..., Collectors.counting())`).
+1. **Thread Creation Overhead**: Creating raw `Thread` instances incurs OS-level overhead. For smaller or very short tasks (e.g., $<50\text{ ms}$), spawning overhead and context switching can offset parallel gains.
+2. **JVM Warmup & JIT**: Java's Just-In-Time (JIT) compiler optimizes hot code paths during runtime. For precise benchmarking, multiple warmup iterations or tools like [JMH (Java Microbenchmark Harness)](https://github.com/openjdk/jmh) are recommended.
+3. **Thread Pools (`ExecutorService`)**: In production systems, reuse threads using `Executors.newFixedThreadPool()` or Java's `ForkJoinPool` / parallel streams (`LongStream.rangeClosed(1, N).parallel().sum()`) to eliminate thread creation overhead.
+4. **Mathematical Optimization**: For arithmetic sequences, Gauss's formula $\frac{N(N+1)}{2}$ computes the sum in $\mathcal{O}(1)$ time with zero loops.
